@@ -98,7 +98,7 @@ plot1 <- ggplot() +
   theme(axis.text = element_text(size = 14), axis.title = element_text(size = 25))
   
 
-ggsave("/Users/violetross/Desktop/FTAS/Efficient Sampling/segmented regression/plot1.png",
+ggsave("/Users/violetross/Desktop/FTAS/Sampling/efficient-sampling/efficient-sampling/figures/sample_size.png",
        plot = plot1, width = 20, height = 9)
 
 ## Why are my results so weird? AKA modified simulation
@@ -144,5 +144,5 @@ plot2 <- plot +
   theme_minimal() +
   theme(axis.text = element_text(size = 14), axis.title = element_text(size = 25))
 
-ggsave("/Users/violetross/Desktop/FTAS/Efficient Sampling/segmented regression/plot2.png",
+ggsave("/Users/violetross/Desktop/FTAS/Sampling/efficient-sampling/efficient-sampling/figures/sample_time.png",
        plot = plot2, width = 20, height = 9)
