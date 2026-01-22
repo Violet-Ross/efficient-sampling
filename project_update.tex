@@ -1,0 +1,266 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{dirtytalk}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage[noend, vlined]{algpseudocodex}
+\usepackage{bbm}
+
+\title{Efficient Approaches to Modeling Viral Kinetics \ {\large Progress Report}}
+\author{Violet Ross}
+\date{January 2026}
+
+\begin{document}
+
+\newcommand{\lint}{\int_0^{\ell_0}}
+\newcommand{\li}{\ell_i}
+\newcommand{\lo}{\ell_0}
+\newcommand{\Var}{\text{Var}}
+\newtheorem{exmp}{Example}[section]
+
+
+\maketitle
+
+\textcolor{red}{Early sketch of project update. NOT complete.}
+
+\section*{Motivating Problems}
+\textbf{Current modeling approaches assume:} To fit a model of viral kinetics, you need to measure viral load regularly from infection time to clearance time in many individuals. 
+
+\noindent \textbf{Problems with this assumption:}
+\begin{itemize}
+    \item Finding infections: Finding an infected individual is expensive. (It is even more expensive to find such an individual \textit{before} they get infected, but this is necessary for the assumed modeling approach.)
+    \item Learning from infections: Current models take in regular (e.g. daily) measurements of viral RNA concentration and output a fit model. However, taking daily measurements of viral load from an infected individual is expensive.
+\end{itemize}
+
+Basically \ldots everything is expensive!
+
+\noindent \textbf{Our goal:} Reduce cost (specifically with regard to testing).
+
+% There are three parts to learning a viral kinetics model from data:
+% \begin{enumerate}
+%     \item Find an infection.
+%     \item Take measurements of viral load over the course of that infection.
+%     \item Fit your model to the measurements.
+% \end{enumerate}
+% But we don't fit a model to a single infection, we learn from many infections. So the process isn't just: find one infection, take measurements from it, fit the model to those measurements, done. We might iterate through $1 \rightarrow 2 \rightarrow 3$ several times, using the new data collected at each iteration to update the model. Or we might alternate 1 and 2 several times, and then fit the model to data collected from all of these iterations. We might even use data collected or models fit at previous iterations to inform how we sample the infections in subsequent iterations. So these three steps: find, sample, and fit, may be implemented in a variety of ways and executed in a variety of orders. Our work seeks to determine the implementation and ordering of these steps that minimizes the amount of testing required.
+
+\section*{On Sampling and Testing}
+\textit{Sampling} and \textit{testing} are not equivalent in this report. When I discuss \textit{sampling} from an individual, I mean only the act of collecting a sample (e.g. saliva) from them. This is does not include taking measurements of or performing tests on the sample. When I \textit{test} a sample, I measure the concentration of virus in it (e.g. through a qt-PCR test). There are costs associated with both sampling and testing. We say testing a sample incurs cost $\omega$. This work describes an approach to minimize the testing cost associated with viral kinetics modeling; we assume some sampling work has been done upfront. However, we foresee this work having natural extensions which focus on lowering sampling costs.
+
+\section{Finding Infections}
+\subsection*{The Problem}
+We have collected daily samples from $m$ individuals over $n$ days. Our samples are arranged into an $n$ by $m$ matrix. Find out who was sick and when.
+
+\subsection*{Brute Force}
+Test every sample. Cost incurred is $m \cdot n \cdot \omega$.
+
+\subsection*{Our Approach}
+We propose the following pooling approach, which offers a [BLANK] reduction in cost while still detecting [BLANK] of the infections.
+    
+\noindent \textbf{Given}: matrix of samples coming from $m$ people over $n$ days. 
+
+\noindent \textbf{Assume}: Each infection $i$ has length $\ell_i$ drawn from some continuous positive distribution where $\ell_i > \ell_0$ with probability $0.95$.
+
+For each person:
+\begin{enumerate}
+    \item Combine all $n$ samples into a single pool and test that pool.
+    \item If the test in step 1 is positive, then individually test that person's samples in increments of $\ell_0$. That is, test time 0, time $\ell_0$, time $2\ell_0$, etc.
+\end{enumerate}
+
+\subsection*{Accuracy Guarantees}
+
+Under this approach, with what probability will we miss a trajectory?
+\begin{equation*}
+\begin{split}
+    P(\text{miss traj } i) &= P(\ell_i < \ell_0) P(\text{miss traj } i | \ell_i < \ell_0) \\
+    &= \int_0^{\infty} P(\ell_i) P(\ell_i < \ell_0) P(\text{miss} | \ell_i < \ell_0) d\li \\
+    &= \lint P(\li) P(\text{miss} | \li < \lo) d\li \\
+    &= \lint P(\li)(1 - \frac{\li}{\lo}) d\li \\
+    &= \lint P(\li) d\li - \lint P(\li)\frac{\li}{\lo} d\li \\
+    &= P(\li < \lo) - \lint P(\li)\frac{\li}{\lo} d\li \\
+    &= 0.05 - \lint P(\li)\frac{\li}{\lo} d\li
+\end{split}
+\end{equation*}
+The actual value of this probability depends on the distribution from which $\ell_i$ is drawn.
+
+
+\begin{exmp}[Exponential Distribution]
+    Suppose $\li \sim \text{Expo}(\lambda)$.
+    \begin{equation*}
+    \begin{split}
+        P(\text{miss traj } i) &= 0.05 - \frac{1}{\lo} \lint P(\li) \li d\li \\
+        &= 0.05 - \frac{1}{\lo} \lint \lambda e^{-\lambda \li} \li d\li \\
+        &=  0.05 - \frac{1}{\lo} \lambda \lint e^{-\lambda \li} \li d\li \\
+        &= 0.05 - \left[ \left(- \frac{1}{\lambda}\li - \frac{1}{\lambda^2} \right) e^{-\lambda \li} \right]_0^{\li} \\
+        &= 0.05 - \frac{\lambda}{\lo} \left( \left( - \frac{1}{\lambda}\lo - \frac{1}{\lambda^2} \right)e^{-\lambda \lo} + \frac{1}{\lambda^2} \right) \\
+        &= 0.05 + e^{-\lambda \lo} + \frac{1}{\lo \lambda} e^{-\lambda \lo} - \frac{1}{\lo \lambda}
+    \end{split}
+    \end{equation*}
+    Recall our guarantee that $\ell_i > \ell_0$ with probability $0.95$. In order to achieve this, we set
+    \begin{equation*}
+        \lambda = - \ln ({0.95}) / \ell_0 \text{.}
+    \end{equation*}
+    Substituting this into our equation for $P(\text{miss traj } i)$, we get 
+    \begin{equation*}
+        P(\text{miss traj } i) \approx 0.0252.
+    \end{equation*}
+    Figure 1 shows the results of our approach on simulated data with $\li \sim \text{Expo}(\lambda)$. The proportion of misses in the simulation align with the above analytical result\footnote{Note that the few trajectories we do miss are very short. By not accounting for these trajectories in our model, we may bias our parameters in favor of longer trajectories.}. See simulation code \href{https://github.com/Violet-Ross/efficient-sampling/blob/main/prob_miss.ipynb}{here}.
+\end{exmp}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{report_images/pooling_misses.png}
+    \caption{The results of our approach on simulated data represented as a matrix of individuals (rows) by days (columns) and colored by infection and detection status. Purple indicates that the individual was not sick on that day. Blue indicates that the individual was sick on that day, and our approach identified this infection. Yellow indicates that the individual was sick on that day, and our approach did not identify this infection. The simulation assumes exponentially distributed duration of infection with $ \lambda = - \ln ({0.95}) / 4 $ and a cumulative incidence of 0.2.}
+    \label{fig:placeholder}
+\end{figure}
+
+\section{Learning from Infections}
+
+\subsection{Fitting to a Single Infection}
+\subsubsection{The Problem}
+We have collected regular samples from an infected individual over the entire trajectory of their infection. How many, and which, of these samples should we test to fit a model of viral kinetics to this infection?
+
+\subsubsection{The Model}
+We model viral kinetics using a two-phase segmented regression model (sometimes called a \say{tent function}). Descriptions of segmented regression and justifications of its application to viral kinetics modeling abound. Recall that
+\begin{equation*}
+\begin{split}
+    &\alpha \text{ is the y-intercept of the first line segment} \\
+    &\beta_1 \text{ is the slope of the first line segment} \\
+    &\beta_2 \text{ is the difference between the slope of the second line segment and the slope of the first} \\
+    &\psi \text{ is the x-value of the breakpoint (the location where the two segments meet)}
+\end{split}
+\end{equation*}
+
+Our approach to fitting a segmented regression model to tested samples and their timestamps, given a step size by which to increment breakpoint estimates, is given in Algorithm \ref{alg:estimating}. The function \Call{estimate\_coefficients}{} performs simple linear regression on the proliferation phase (before breakpoint) and clearance phase (after breakpoint) to compute the coefficient estimates $\hat{\alpha}, \hat{\beta_1}$, and $\hat{\beta_2}$.
+\begin{algorithm}
+\caption{Estimate Coefficients and Breakpoint}\label{alg:estimating}
+\textbf{Input:} \\
+array of timestamps and measurements $P$ where $P[i] = $ [time of $i$th sample, viral load in $i$th sample],  \\
+stepsize for breakpoint estimation $c$ \\
+\textbf{Output:} estimates $(\hat{\alpha}, \hat{\beta_1}, \hat{\beta_2}, \psi)$
+\begin{algorithmic}[1]
+\State min\_sse $\gets \infty$
+\For{$b$ in range(\Call{second\_min}{$P_{\text{time}}$}, \Call{second\_max}{$P_{\text{time}}$}, by = c)}
+    \State $\hat{\alpha}^{(b)}, \hat{\beta_1}^{(b)}, \hat{\beta_2}^{(b)} \gets$ \Call{estimate\_coefficients}{P, b}
+    \State sse $\gets$ \Call{compute\_sse}{$\hat{\alpha}^{(b)}, \hat{\beta_1}^{(b)}, \hat{\beta_2}^{(b)}, b, P$}
+    \If{sse $<$ min\_sse}
+        \State min\_sse $\gets$ sse
+        \State parameters $\gets (\hat{\alpha}^{(b)}, \hat{\beta_1}^{(b)}, \hat{\beta_2}^{(b)}, b)$ 
+    \EndIf
+\EndFor
+\Return parameters
+\end{algorithmic}
+\end{algorithm}
+
+The input to Algorithm \ref{alg:estimating} is a set of tested samples, so before we apply the algorithm, we must decide which samples to test. One approach to selecting these samples is uniform random sampling. The algorithm for selecting and testing $m$ samples through uniform random sampling is given in Algorithm \ref{alg:random}. We set the initial condition in line 1 to meet the requirement of that Algorithm \ref{alg:estimating} that $P$ contains at least 4 points.
+
+\begin{algorithm}[H]
+\caption{Uniform Random Sampling}\label{alg:random}
+\textbf{Input:} \\
+array of sample timestamps $S$ where $S[i] = [\text{time of $i$th sample}]$, \\ 
+number of samples to measure $m \geq 4$,\\
+stepsize for breakpoint estimation $c$ \\
+\textbf{Output:} estimates $(\hat{\alpha}, \hat{\beta_1}, \hat{\beta_2}, \hat{\psi})$
+\begin{algorithmic}[1]
+\State $P \gets$ ($S[0]$, $S[\text{len}(S) // 3]$, $S[(\text{len(S)} // 3) * 2]$, $S[-1]$)
+\For{$i$ in range(0, m - 4)}
+    \State select $s \in S \setminus P$ u.a.r
+    \State $P \gets$ append $s$ to $P$
+\EndFor
+\State $P \gets $ \Call{Measure\_All}{$P$} \\
+\Return \Call{Estimate}{$P, c$}
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Varmin Sampling}
+\textbf{Intuition:} Let's choose the size $m$ subset by selecting the samples which would minimize the variance of our slope estimates.
+
+Think back to simple linear regression. We assume points are generated by the underlying model
+\begin{equation*}
+    y = \alpha + \beta_1 x + \varepsilon
+\end{equation*}
+where $x$ and $y$ are the independent and dependent variables, $\alpha$ is the y-intercept of the line, $\beta_1$ is the slope of the line, and $\varepsilon$ is random error whose distribution has mean 0 and variance $\sigma^2$.
+We then estimate $\alpha$ and $\beta_1$ from the data $(x_1, y_1), (x_2, y_2), \ldots$ using the least squares estimates
+\begin{equation*}
+    \begin{split}
+        \hat{\alpha} &= \bar{y} - \hat{\beta_1} \bar{x} \\
+        \hat{\beta_1} &= \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sum_i (x_i - \bar{x})^2}.
+    \end{split}
+\end{equation*}
+The variance of the slope estimate is
+\begin{equation*}
+    \Var(\hat{\beta_1}) = \frac{\sigma^2}{\sum_i (x_i - \bar{x})^2}.
+\end{equation*}
+So the more spread out our $x_i$, the less variable our $\beta_1$ estimator. Note that the value of the dependent variable does not play a role in the variance calculation. Can we extend this result to segmented regression, getting better estimation by testing the samples whose positions on the time axis minimize variance?
+    
+The equation for two-phase segmented regression looks similar to simple linear regression, but with an additional term to represent the change in slope following the breakpoint:
+\begin{equation*}
+    y = \alpha + \beta_1 x + \beta_2 \mathbbm{1}_{\{x > \psi\}} + \varepsilon
+\end{equation*}
+where $\mathbbm{1}_{\{x > \psi\}}$ is the indicator that equals 1 when x is past the breakpoint and 0 otherwise. Then the variances of the $\beta$ estimates are 
+\begin{equation*}
+    \begin{split}
+        \Var(\hat{\beta_1}) &= \frac{\sigma^2}{\sum_{i : x_i < \psi} (x_i - \bar{x}_-)^2} \\
+        \Var(\hat{\beta_2}) &= \frac{\sigma^2}{\sum_{i : x_i < \psi} (x_i - \bar{x}_-)^2} + \frac{\sigma^2}{\sum_{i : x_i > \psi} (x_i - \bar{x}_+)^2} 
+    \end{split}
+\end{equation*}
+where $\bar{x}_-$ and $\bar{x}_+$ are the pre- and post-breakpoint means, respectively.
+We design an algorithm that, given $m$, selects the subset of $m$ points that minimizes the sum of the $\hat{\beta}$ variances
+\begin{equation*}
+    \Var(\hat{\beta_1}) + \Var(\hat{\beta_1}) = 2\frac{\sigma^2}{\sum_{i : x_i < \psi} (x_i - \bar{x}_-)^2} + \frac{\sigma^2}{\sum_{i : x_i > \psi} (x_i - \bar{x}_+)^2}.
+\end{equation*}
+
+
+\begin{algorithm}
+\caption{Smart Varmin Sampling}\label{alg:smart-varmin}
+\textbf{Input:} \\
+array of sample timestamps $S$ where $S[i] = [\text{time of $i$th sample}]$, \\ 
+number of samples to measure $m \geq 4$,\\
+stepsize for breakpoint estimation $c$ \\
+\textbf{Output:} estimates $(\hat{\alpha}, \hat{\beta_1}, \hat{\beta_2}, \hat{\psi})$
+\begin{algorithmic}
+\State $P \gets$ ($S[0]$, $S[\text{len}(S) // 3]$, $S[(\text{len(S)} // 3) * 2]$, $S[-1]$)
+\State $M \gets$ \Call{measure\_all}{$P$} 
+\State $\hat{\alpha}^{(0)}, \hat{\beta_1}^{(0)}, \hat{\beta_2}^{(0)}, b^{(0)} \gets$ \Call{estimate}{$M, c$} 
+\State $b \gets  b^{(0)}$
+\State min\_var $\gets \infty$
+\For{$i$ in range(0, m - 4)}
+    \For{$s$ in $S \setminus P$}
+        \State combo $\gets$ append $s$ to $P$
+        \State slope\_var $\gets$ \Call{compute\_slope\_variance}{$b$, combo}
+        \If{slope\_var $<$ min\_var}
+            \State min\_var $\gets$ slope\_var
+            \State optimal\_combo $\gets$ combo
+        \EndIf
+    \EndFor
+    \State $P \gets$ optimal\_combo
+    \State $M \gets$ \Call{measure\_all}{$P$} 
+    \State $\hat{\alpha}^{(i+1)}, \hat{\beta_1}^{(i+1)}, \hat{\beta_2}^{(i+1)}, b^{(i+1)} \gets$ \Call{estimate}{$M, c$} 
+    \State $b \gets  b^{(i)}$
+\EndFor
+\Return \Call{estimate}{$P, c$}
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Comparing Algorithms}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{report_images/parameter_est.png}
+    \caption{The averaged performance of each of the four sampling and fitting approaches over five trajectories. Each trajectory was generated according to [BLANK], after which 20 points were sampled from it with normally distributed error (standard deviation = 0.1).}
+    \label{fig:placeholder}
+\end{figure}
+
+
+\section*{Accomplished}
+\begin{itemize}
+    \item Began working in a brand new application area (ID Epi) and learned a lot!
+    \item Submitted a GRFP on this topic
+    \item Optimal approach for 1, 2, 3, done.
+\end{itemize}
+
+\bibliographystyle{plain} 
+\bibliography{sources.bib}	
+
+\end{document}
