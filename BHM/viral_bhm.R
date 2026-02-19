@@ -4,7 +4,7 @@ library(tidyverse)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-synth <- read_csv("/Users/violetross/Desktop/FTAS/Sampling/efficient-sampling/BHM/code/synthetics.csv")
+synth <- read_csv("synthetics.csv")
 id <- synth[[1]]
 y <- synth[[2]]
 x <- synth[[3]]
