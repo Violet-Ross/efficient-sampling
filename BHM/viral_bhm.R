@@ -4,10 +4,10 @@ library(tidyverse)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-synth <- read_csv("synthetics.csv")
+synth <- read_csv("synthetic.csv")
 id <- synth[[1]]
-y <- synth[[2]]
-x <- synth[[3]]
+x <- synth[[2]]
+y <- synth[[3]]
 
 J <- max(id)                  # individuals
 n_per <- sum(id == 1)         # observations per individual
@@ -30,7 +30,9 @@ fit <- stan(
   seed = 123
 )
 
-print(fit, pars = c("mu_sigma", "mu_beta1",
+saveRDS(fit, file = "stan_fit.rds")
+
+print(fit, pars = c("mu_alpha", "mu_beta1",
                     "mu_beta2", "mu_psi",
                     "sigma_eps"))
 
@@ -42,11 +44,11 @@ post <- rstan::extract(fit)
 
 # Time grid
 x_grid <- seq(min(x), max(x), length.out = 200)
-n_draws <- length(post$mu_sigma)
+n_draws <- length(post$mu_alpha)
 
 # Compute trajectory for all draws
 curve_draws <- sapply(1:n_draws, function(i) {
-  post$mu_sigma[i] +
+  post$mu_alpha[i] +
     post$mu_beta1[i] * x_grid +
     post$mu_beta2[i] * pmax(0, x_grid - post$mu_psi[i])
 })
@@ -72,23 +74,3 @@ ggplot(df_summary, aes(x = x, y = mean)) +
        title = "Population Viral Trajectory with 95% CI") +
   theme_minimal()
 
-#####
-par(mfrow = c(2, 2))
-
-plot(density(post$mu_sigma),
-     main = "Posterior of mu_sigma",
-     xlab = "mu_sigma")
-
-plot(density(post$mu_beta1),
-     main = "Posterior of mu_beta1",
-     xlab = "mu_beta1")
-
-plot(density(post$mu_beta2),
-     main = "Posterior of mu_beta2",
-     xlab = "mu_beta2")
-
-plot(density(post$mu_psi),
-     main = "Posterior of mu_psi",
-     xlab = "mu_psi")
-
-par(mfrow = c(1, 1))
