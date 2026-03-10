@@ -33,7 +33,7 @@ fit <- stan(
 )
 
 # save fit model
-saveRDS(fit, file = "stan_fit.rds")
+saveRDS(fit, file = "throughput/viral_bhm.rds")
 
 # print the posteriors
 print(fit, pars = c("mu_alpha", "mu_beta1",
