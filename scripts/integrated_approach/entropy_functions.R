@@ -29,7 +29,7 @@ entropy_maximizer <- function(infection_num, N = 1){
 test_points <- function(person_id, x_vals){
   person <- matrix[person_id,]
   infection_start <- all_trajectories[all_trajectories$person_values == person_id, 5][1]
-  y_vals <- unlist(matrix[2, (infection_start + x_vals - 1)])
+  y_vals <- unlist(matrix[person_id, (infection_start + x_vals - 1)])
   
   return(y_vals)
 }

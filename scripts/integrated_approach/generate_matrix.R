@@ -23,6 +23,10 @@ sigma_beta1 <- abs(rnorm(1, 0, sd = 0.1))
 sigma_beta2 <- abs(rnorm(1, 0, sd = 0.1))
 sigma_psi <- abs(rnorm(1, 0, sd = 0.1))
 
+pop_params <- data.frame(mu_alpha, mu_beta1, mu_beta2, mu_psi,
+                         sigma_alpha, sigma_beta1, sigma_beta2, sigma_psi)
+write_csv(pop_params, "throughput/integrated_true_population_params.csv")
+
 for(row_ind in 1:nrow(infection_matrix)){
   if(is_infx[row_ind] == 1){
     # individual level parameters
